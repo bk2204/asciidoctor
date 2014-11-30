@@ -207,6 +207,11 @@ module Asciidoctor
             require 'asciidoctor/converter/docbook45'.to_s
           end
           DocBook45Converter.new backend, opts
+        when 'mallard'
+          unless defined? ::Asciidoctor::Converter::MallardConverter
+            require 'asciidoctor/converter/mallard'.to_s
+          end
+          MallardConverter.new backend, opts
         end
 
         return base_converter unless opts.key? :template_dirs
