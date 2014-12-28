@@ -879,6 +879,20 @@ text
         assert converter.respond_to? element
       end
     end
+
+    test 'built-in Mallard views are registered when backend is mallard' do
+      doc = document_from_string '', :attributes => {'backend' => 'mallard'}
+      converter = doc.converter
+      assert_equal 'mallard', doc.attributes['backend']
+      assert doc.attributes.has_key? 'backend-mallard'
+      assert_equal 'mallard', doc.attributes['basebackend']
+      assert doc.attributes.has_key? 'basebackend-mallard'
+      converter = doc.converter
+      assert converter.is_a? Asciidoctor::Converter::MallardConverter
+      BUILT_IN_ELEMENTS.each do |element|
+        assert converter.respond_to? element
+      end
+    end
   end
 
   context 'Structure' do
@@ -1115,6 +1129,51 @@ content
       assert_css 'revhistory', output, 0
     end
 
+    test 'should include revision element if revdate and revnumber is set' do
+      input = <<-EOS
+= Document Title
+Author Name
+:revdate: 2011-11-11
+:revnumber: 1.0
+
+content
+      EOS
+
+      output = render_string input, :backend => 'mallard'
+      assert_xpath '//info/revision', output, 1
+      assert_xpath '//info/revision[@version="1.0"]', output, 1
+      assert_xpath '//info/revision[@date = "2011-11-11"]', output, 1
+    end
+
+    test 'should include revision element if revdate is set' do
+      input = <<-EOS
+= Document Title
+Author Name
+:revdate: 2011-11-11
+
+content
+      EOS
+
+      output = render_string input, :backend => 'mallard'
+      assert_xpath '//info/revision', output, 1
+      assert_xpath '//info/revision[@version]', output, 0
+      assert_xpath '//info/revision[@date = "2011-11-11"]', output, 1
+    end
+
+    test 'should not include revision if revdate and revnumber are not set' do
+      input = <<-EOS
+= Document Title
+Author Name
+:revremark: features!
+
+content
+      EOS
+
+      output = render_string input, :backend => 'mallard'
+      assert_xpath '//info/revision', output, 0
+    end
+
+
     test 'with metadata to DocBook45' do
       input = <<-EOS
 = AsciiDoc
@@ -1156,6 +1215,27 @@ more info...
       assert_xpath '/article/info/author/personname/firstname[text() = "Stuart"]', output, 1
       assert_xpath '/article/info/author/personname/surname[text() = "Rackham"]', output, 1
       assert_xpath '/article/info/author/email[text() = "founder@asciidoc.org"]', output, 1
+    end
+
+    test 'with metadata to Mallard' do
+      input = <<-EOS
+= AsciiDoc
+Stuart Rackham <founder@asciidoc.org>
+
+== Version 8.6.8
+
+more info...
+      EOS
+      output = render_string input, :backend => 'mallard'
+      assert_xpath '/page/title', output, 1
+      assert_xpath '/page/title[text() = "AsciiDoc"]', output, 1
+      assert_xpath '/page/info', output, 1
+      assert_xpath '/page/info/credit', output, 1
+      assert_xpath '/page/info/credit[@type = "author"]', output, 1
+      assert_xpath '/page/info/credit[@type = "author"]', output, 1
+      assert_xpath '/page/info/credit[@type = "author"]/name', output, 1
+      assert_xpath '/page/info/credit[@type = "author"]/name[text() = "Stuart Rackham"]', output, 1
+      assert_xpath '/page/info/credit[@type = "author"]/email[text() = "founder@asciidoc.org"]', output, 1
     end
 
     test 'with author defined using attribute entry to DocBook 4.5' do
@@ -1212,6 +1292,24 @@ content
       assert_xpath '//articleinfo/authorgroup/author[2]/firstname[text() = "Junior"]', output, 1
     end
 
+    test 'should create credit elements in Mallard when multiple authors' do
+      input = <<-EOS
+= Document Title
+Doc Writer <thedoctor@asciidoc.org>; Junior Writer <junior@asciidoctor.org>
+
+content
+      EOS
+
+      output = render_string input, :backend => 'mallard'
+      assert_xpath '//info', output, 1
+      assert_xpath '//info/credit', output, 2
+      assert_xpath '//info/credit[@type = "author"]', output, 2
+      assert_xpath '//info/credit[1]/name[text() = "Doc Writer"]', output, 1
+      assert_xpath '//info/credit[1]/email[text() = "thedoctor@asciidoc.org"]', output, 1
+      assert_xpath '//info/credit[2]/name[text() = "Junior Writer"]', output, 1
+      assert_xpath '//info/credit[2]/email[text() = "junior@asciidoctor.org"]', output, 1
+    end
+
     test 'with authors defined using attribute entry to DocBook' do
       input = <<-EOS
 = Document Title
@@ -1230,6 +1328,26 @@ content
       assert_xpath '(//articleinfo/authorgroup/author)[1]/email[text() = "thedoctor@asciidoc.org"]', output, 1
       assert_xpath '(//articleinfo/authorgroup/author)[2]/firstname[text() = "Junior"]', output, 1
       assert_xpath '(//articleinfo/authorgroup/author)[2]/email[text() = "junior@asciidoc.org"]', output, 1
+    end
+
+    test 'with authors defined using attribute entry to Mallard' do
+      input = <<-EOS
+= Document Title
+:authors: Doc Writer; Junior Writer
+:email_1: thedoctor@asciidoc.org
+:email_2: junior@asciidoc.org
+
+content
+      EOS
+
+      output = render_string input, :backend => 'mallard'
+      assert_xpath '//info', output, 1
+      assert_xpath '//info/credit', output, 2
+      assert_xpath '//info/credit[@type = "author"]', output, 2
+      assert_xpath '//info/credit[1]/name[text() = "Doc Writer"]', output, 1
+      assert_xpath '//info/credit[1]/email[text() = "thedoctor@asciidoc.org"]', output, 1
+      assert_xpath '//info/credit[2]/name[text() = "Junior Writer"]', output, 1
+      assert_xpath '//info/credit[2]/email[text() = "junior@asciidoc.org"]', output, 1
     end
 
     test 'with header footer' do
